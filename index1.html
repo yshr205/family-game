@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Family Fun Challenge — v13 (syntax-safe + mobile)</title>
+  <style>
+    :root{--bg1:#a21caf;--bg2:#ec4899;--bg3:#f43f5e;--card:rgba(255,255,255,.94);--muted:#6b7280}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(135deg,var(--bg1),var(--bg2),var(--bg3));min-height:100svh;color:#111}
+    .container{max-width:1100px;margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+    h1{color:#fff;text-align:center;margin:6px 0 6px;font-size:clamp(28px,4.5vw,40px)}
+    p.lead{color:#fff;opacity:.92;text-align:center;margin:0 0 14px}
+    .grid{display:grid;gap:16px}
+    @media(min-width:640px){.grid-3{grid-template-columns:repeat(3,1fr)}}
+    @media(min-width:880px){.grid-2{grid-template-columns:1fr 1fr}}
+    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.10)}
+    .card-h{padding:18px 18px 0}
+    .card-c{padding:18px}
+    .center{text-align:center}
+    .btn{appearance:none;border:1px solid #ddd;background:#fff;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer;min-height:48px;touch-action:manipulation}
+    .btn.primary{background:#111;color:#fff;border-color:#111}
+    .btn.big{padding:14px 22px;font-size:18px;min-height:56px}
+    .row{display:flex;gap:10px;align-items:center}
+    .row.center{justify-content:center}
+    .badge{font-size:12px;border:1px solid #e5e7eb;border-radius:999px;padding:6px 10px;background:#fff}
+    .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+    .progress .done{background:#111;color:#fff}
+    .avatar{width:72px;height:72px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800}
+    .pink{background:#ec4899}.blue{background:#3b82f6}.green{background:#22c55e}.orange{background:#f97316}.purple{background:#a855f7}
+    .grid-cards{display:grid;grid-template-columns:repeat(4,72px);gap:10px;justify-content:center}
+    .memory-card{height:72px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;cursor:pointer;border:1px solid #e5e7eb;background:#e9d5ff}
+    .memory-card.solved{background:#bbf7d0}
+    .puzzle{display:grid;grid-template-columns:repeat(4,72px);gap:8px;justify-content:center}
+    .puzzle button{height:72px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;font-weight:800;font-size:18px}
+    .puzzle button.solved{background:#bbf7d0}
+    .muted{color:var(--muted)}
+    .mt{margin-top:12px}
+    .mt2{margin-top:20px}
+    .table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    .tr{background:#fff;border:1px solid #e5e7eb;border-radius:12px}
+    .td{padding:10px 12px}
+    .right{text-align:right}
+    .colorRow{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:10px;justify-content:center}
+    @media(min-width:480px){.colorRow{grid-template-columns:repeat(4,120px)}}
+    .colorBtn{height:48px;border-radius:12px;border:1px solid rgba(0,0,0,.08);font-weight:700;cursor:pointer}
+    .bigWord{font-size:clamp(32px,8vw,56px);font-weight:900;margin:8px 0 16px}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:10px}
+    .pill{padding:8px 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fff;cursor:pointer}
+    .pill.active{background:#111;color:#fff;border-color:#111}
+    .intro{background:#fff;border:1px dashed #e5e7eb;border-radius:12px;padding:12px}
+    .playersRow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+    .playersRow .btn{padding:8px 12px}
+    .selftest{position:fixed;bottom:10px;right:10px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+    .pass{color:#16a34a}.fail{color:#dc2626}
+    .errorBox{position:fixed;left:12px;right:12px;bottom:12px;background:#fee2e2;border:1px solid #fecaca;border-radius:12px;padding:10px 12px;color:#991b1b}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="err" class="errorBox" style="display:none"></div>
+  <script>
+  (function(){
+    'use strict';
+
+    // ---------- Utils ----------
+    const $ = (sel,root=document)=>root.querySelector(sel);
+    const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
+    const root = $('#root');
+    const vibrate = (p)=>{ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} };
+    const sec = (ms)=> (ms/1000).toFixed(2);
+
+    // ---------- Localized strings ----------
+    const STR = {
+      en: {
+        welcomeTitle: 'Family Fun Challenge',
+        welcomeSubtitle: 'Quick games with stats & leaders at the end.',
+        clickToStart: 'Click to start your challenge',
+        challengeOf: (n)=>`Challenge ${n}`,
+        backToFamily: 'Back to Family',
+        viewStats: 'View Stats',
+        howTitle: 'How to play',
+        startGame: 'Start Game',
+        settings: 'Settings',
+        skipIntros: 'Skip intros',
+        selectPlayer: 'Select player',
+
+        statsTitle: 'Results & Leaders (Arabic view)', // header stays Arabic on stats
+        yourResults: 'Your Results',
+        leaders: 'Leaders',
+        bestEach: 'Best at each game',
+        allRuns: 'All Players – Latest Runs',
+        noRuns: 'No runs yet.',
+        playAgain: 'Play Again',
+        resetPlayer: 'Reset Player',
+        confirmResetPlayer: (n)=>`Reset scores for ${n}?`,
+        best: 'Best', latest: 'Latest', viewMode: 'View',
+
+        numberTitle:'Number Guess', numberDesc:'Guess the hidden number between 1–50.', guess:'Guess', tries:'Tries', higher:'Higher!', lower:'Lower!', correct:'Correct!', time:'Time (s)',
+        reactTitle:'Reaction Tap', reactDesc:'5 quick rounds · average your reaction time.', start:'START', wait:'Wait...', tap:'TAP!', tooSoon:'Too soon! Tap START to try again.', round:(r)=>`Round: ${r} / 5`, avg:(ms)=>`Avg: ${ms} ms`, avgMs:'Avg (ms)',
+        memoryTitle:'Card Flip Memory', memoryDesc:'Match all pairs.', pairsLeft:(n)=>`${n} pairs left`, flips:'Flips',
+        puzzleTitle:'Tap 1 → 16', puzzleDesc:'Tap numbers in order as fast as you can.', next:'Next', wrongTry:'Wrong! Start again', mistakes:'Mistakes',
+        stroopTitle:'Color Clash', stroopDesc:'Choose the INK color, not the word.', secondsLeft:(s)=>`Time: ${s}s`, correctCount:'Correct', wrongCount:'Wrong', streak:'Streak', bestStreak:'Best streak',
+        colors:[
+          {key:'red',en:'Red',ar:'أحمر',fr:'Rouge',hex:'#ef4444'},
+          {key:'green',en:'Green',ar:'أخضر',fr:'Vert',hex:'#22c55e'},
+          {key:'blue',en:'Blue',ar:'أزرق',fr:'Bleu',hex:'#3b82f6'},
+          {key:'yellow',en:'Yellow',ar:'أصفر',fr:'Jaune',hex:'#eab308'},
+          {key:'purple',en:'Purple',ar:'أرجواني',fr:'Violet',hex:'#a855f7'},
+          {key:'orange',en:'Orange',ar:'برتقالي',fr:'Orange',hex:'#f97316'}
+        ]
+      },
+      ar: {
+        welcomeTitle:'تحدي العائلة الممتع', welcomeSubtitle:'ألعاب سريعة مع الإحصائيات ولوحة الصدارة في النهاية.', clickToStart:'انقر لبدء التحدي',
+        challengeOf:(n)=>`تحدي ${n}`, backToFamily:'العودة إلى العائلة', viewStats:'عرض الإحصائيات',
+        howTitle:'طريقة اللعب', startGame:'ابدأ اللعب', settings:'الإعدادات', skipIntros:'تخطي الشرح', selectPlayer:'اختر اللاعب',
+        statsTitle:'النتائج ولوحة الصدارة', yourResults:'نتائجك', leaders:'لوحة الصدارة', bestEach:'الأفضل في كل لعبة', allRuns:'جميع اللاعبين – آخر المحاولات', noRuns:'لا توجد نتائج بعد.',
+        playAgain:'اللعب مرة أخرى', resetPlayer:'مسح نتائج اللاعب', confirmResetPlayer:(n)=>`هل تريد مسح نتائج ${n} فقط؟`, best:'الأفضل', latest:'الأحدث', viewMode:'العرض',
+        numberTitle:'تخمين الرقم', numberDesc:'خمّن الرقم المخفي بين 1 و50', guess:'خمن', tries:'المحاولات', higher:'أعلى!', lower:'أدنى!', correct:'صحيح!', time:'الزمن (ث)',
+        reactTitle:'اختبار الاستجابة', reactDesc:'٥ جولات سريعة · يُحسب متوسط زمن الاستجابة', start:'ابدأ', wait:'انتظر...', tap:'اضغط!', tooSoon:'مبكر جدًا! اضغط «ابدأ» للمحاولة مجددًا.', round:(r)=>`الجولة: ${r} من 5`, avg:(ms)=>`المتوسط: ${ms} مللي ثانية`, avgMs:'المتوسط (مللي)',
+        memoryTitle:'لعبة الذاكرة', memoryDesc:'طابق كل الأزواج', pairsLeft:(n)=>`${n} أزواج متبقية`, flips:'محاولات التقليب',
+        puzzleTitle:'اضغط 1 → 16', puzzleDesc:'اضغط الأرقام بالترتيب بأسرع ما يمكن', next:'التالي', wrongTry:'خطأ! ابدأ من جديد', mistakes:'أخطاء',
+        stroopTitle:'تحدي الألوان', stroopDesc:'اختر لون الحبر لا الكلمة', secondsLeft:(s)=>`الوقت: ${s} ث`, correctCount:'صحيح', wrongCount:'خطأ', streak:'سلسلة', bestStreak:'أفضل سلسلة',
+        colors:[
+          {key:'red',en:'Red',ar:'أحمر',fr:'Rouge',hex:'#ef4444'},
+          {key:'green',en:'Green',ar:'أخضر',fr:'Vert',hex:'#22c55e'},
+          {key:'blue',en:'Blue',ar:'أزرق',fr:'Bleu',hex:'#3b82f6'},
+          {key:'yellow',en:'Yellow',ar:'أصفر',fr:'Jaune',hex:'#eab308'},
+          {key:'purple',en:'Purple',ar:'أرجواني',fr:'Violet',hex:'#a855f7'},
+          {key:'orange',en:'Orange',ar:'برتقالي',fr:'Orange',hex:'#f97316'}
+        ]
+      },
+      fr: {
+        welcomeTitle:'Défi familial', welcomeSubtitle:'Jeux rapides avec statistiques et classement final.', clickToStart:'Clique pour commencer le défi',
+        challengeOf:(n)=>`Défi de ${n}`, backToFamily:'Retour à la famille', viewStats:'Voir les statistiques',
+        howTitle:'Comment jouer', startGame:'Commencer', settings:'Paramètres', skipIntros:'Passer les explications', selectPlayer:'Choisir le joueur',
+        statsTitle:'Résultats & Classements', yourResults:'Tes résultats', leaders:'Classement', bestEach:'Meilleur par jeu', allRuns:'Tous les joueurs – Dernières parties', noRuns:'Pas encore de résultats.',
+        playAgain:'Rejouer', resetPlayer:'Effacer les scores du joueur', confirmResetPlayer:(n)=>`Effacer les scores de ${n} ?`, best:'Record', latest:'Dernier', viewMode:'Vue',
+        numberTitle:'Devine le nombre', numberDesc:'Devine le nombre entre 1 et 50', guess:'Deviner', tries:'Essais', higher:'Plus haut !', lower:'Plus bas !', correct:'Correct !', time:'Temps (s)',
+        reactTitle:'Test de réflexes', reactDesc:'5 manches rapides · moyenne de ta réaction', start:'DÉMARRER', wait:'Attends...', tap:'APPUIE !', tooSoon:'Trop tôt ! Appuie sur DÉMARRER pour réessayer.', round:(r)=>`Manche : ${r} / 5`, avg:(ms)=>`Moy : ${ms} ms`, avgMs:'Moy (ms)',
+        memoryTitle:'Mémoire de cartes', memoryDesc:'Trouve toutes les paires', pairsLeft:(n)=>`${n} paires restantes`, flips:'Retours',
+        puzzleTitle:'Appuie 1 → 16', puzzleDesc:'Appuie sur les nombres dans l’ordre le plus vite possible', next:'Suivant', wrongTry:'Raté ! Recommence', mistakes:'Erreurs',
+        stroopTitle:'Défi des couleurs', stroopDesc:"Choisis la COULEUR de l’encre, pas le mot", secondsLeft:(s)=>`Temps : ${s}s`, correctCount:'Justes', wrongCount:'Fautes', streak:'Série', bestStreak:'Meilleure série',
+        colors:[
+          {key:'red',en:'Red',ar:'أحمر',fr:'Rouge',hex:'#ef4444'},
+          {key:'green',en:'Green',ar:'أخضر',fr:'Vert',hex:'#22c55e'},
+          {key:'blue',en:'Blue',ar:'أزرق',fr:'Bleu',hex:'#3b82f6'},
+          {key:'yellow',en:'Yellow',ar:'أصفر',fr:'Jaune',hex:'#eab308'},
+          {key:'purple',en:'Purple',ar:'أرجواني',fr:'Violet',hex:'#a855f7'},
+          {key:'orange',en:'Orange',ar:'برتقالي',fr:'Orange',hex:'#f97316'}
+        ]
+      }
+    };
+
+    const LANG_BY_MEMBER = { mom:'ar', dad:'ar', mokhtar:'en', ahmed:'fr', imene:'fr' };
+    const MEMBERS = [
+      { id:'mom', name:'Mama', color:'pink' },
+      { id:'dad', name:'Papa', color:'blue' },
+      { id:'mokhtar', name:'Mokhtar', color:'green' },
+      { id:'ahmed', name:'Ahmed', color:'orange' },
+      { id:'imene', name:'Imene', color:'purple' },
+    ];
+
+    // ---------- Storage & comparisons ----------
+    const LS_KEY = 'ffc_board_v13_0';
+    const loadBoard = ()=>{ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{"runs":{}}'); }catch(e){ return {runs:{}}; } };
+    const saveBoard = (b)=> localStorage.setItem(LS_KEY, JSON.stringify(b));
+
+    const better = {
+      number: (a,b)=> a && (!b || a.tries < b.tries || (a.tries===b.tries && a.timeMs < b.timeMs)),
+      react:  (a,b)=> a && (!b || a.avgMs < b.avgMs),
+      cards:  (a,b)=> a && (!b || a.flips < b.flips || (a.flips===b.flips && a.timeMs < b.timeMs)),
+      puzzle: (a,b)=> a && (!b || a.timeMs < b.timeMs || (a.timeMs===b.timeMs && (a.mistakes||0) < (b.mistakes||0))),
+      stroop: (a,b)=> a && (!b || a.correct > b.correct || (a.correct===b.correct && (a.avgMs||999999) < (b.avgMs||999999))),
+    };
+
+    // ---------- Global UI state ----------
+    let screen = 'welcome';
+    let member = null;
+    let step = 0; // game index
+    let done = {}; // gameId => true
+    let sessionStats = {}; // gameId => stats
+    let lang = 'en';
+    let viewMode = 'best';
+    let board = loadBoard();
+    let skipIntros = (localStorage.getItem('ffc_skipIntros') === '1');
+
+    const games = [
+      {id:'number', titleKey:'numberTitle'},
+      {id:'react',  titleKey:'reactTitle'},
+      {id:'cards',  titleKey:'memoryTitle'},
+      {id:'puzzle', titleKey:'puzzleTitle'},
+      {id:'stroop', titleKey:'stroopTitle'},
+    ];
+
+    function setDir(){
+      const isStats = screen==='stats';
+      const d = isStats ? 'rtl' : (lang==='ar'?'rtl':'ltr');
+      document.documentElement.dir = d;
+    }
+
+    function setScreen(s){ screen=s; render(); }
+
+    function startFor(m){
+      member=m; step=0; done={}; sessionStats={}; lang = LANG_BY_MEMBER[m.id] || 'en';
+      setScreen('game');
+    }
+
+    function endRun(){
+      // merge sessionStats into board.latest and improve best
+      const prev = (board.runs[member.id]) || { latest:{}, best:{} };
+      const latest = Object.assign({}, prev.latest, sessionStats);
+      const best = Object.assign({}, prev.best);
+      Object.keys(latest).forEach((gid)=>{
+        const val = latest[gid];
+        if(!best[gid] || (better[gid] && better[gid](val,best[gid]))) best[gid]=val;
+      });
+      board = { runs: Object.assign({}, board.runs, { [member.id]: { latest, best } }) };
+      saveBoard(board);
+      setScreen('stats');
+    }
+
+    function computeLeaders(mode){
+      const runs = board.runs || {}; const best={ number:null, react:null, cards:null, puzzle:null, stroop:null };
+      Object.keys(runs).forEach((mid)=>{
+        const stats = (runs[mid] && runs[mid][mode]) || {};
+        if(stats.number){ const v=stats.number; const s=Object.assign({memberId:mid},v); if(!best.number || better.number(v,best.number)) best.number=s; }
+        if(stats.react){ const v=stats.react; const s=Object.assign({memberId:mid},v); if(!best.react || better.react(v,best.react)) best.react=s; }
+        if(stats.cards){ const v=stats.cards; const s=Object.assign({memberId:mid},v); if(!best.cards || better.cards(v,best.cards)) best.cards=s; }
+        if(stats.puzzle){ const v=stats.puzzle; const s=Object.assign({memberId:mid},v); if(!best.puzzle || better.puzzle(v,best.puzzle)) best.puzzle=s; }
+        if(stats.stroop){ const v=stats.stroop; const s=Object.assign({memberId:mid},v); if(!best.stroop || better.stroop(v,best.stroop)) best.stroop=s; }
+      });
+      return best;
+    }
+
+    // ---------- Games ----------
+    function NumberGuess(S){
+      const card = el('div',{class:'card'});
+      const h = el('div',{class:'card-h'}); h.appendChild(el('h3',{},S.numberTitle)); h.appendChild(el('p',{class:'muted'},S.numberDesc)); card.appendChild(h);
+      const c = el('div',{class:'card-c center'}); card.appendChild(c);
+
+      if(!skipIntros){
+        const intro = el('div',{class:'intro'}, S.howTitle+': '+S.numberDesc);
+        const startBtn = el('button',{class:'btn primary mt',onclick:()=>{ intro.remove(); run(); }}, S.startGame);
+        c.appendChild(intro); c.appendChild(startBtn); return card;
+      }
+      run(); return card;
+
+      function run(){
+        const target = Math.floor(Math.random()*50)+1;
+        const startAt = performance.now();
+        let tries = 0; let hint = '';
+        c.innerHTML='';
+        const row = el('div',{class:'row center'});
+        const input = el('input',{class:'btn',style:'min-width:120px',placeholder:'1–50',inputMode:'numeric'});
+        const btn = el('button',{class:'btn primary'}, S.guess);
+        const p1 = el('p',{class:'mt'},'');
+        const p2 = el('p',{class:'muted'},'');
+        row.appendChild(input); row.appendChild(btn); c.appendChild(row); c.appendChild(p1); c.appendChild(p2);
+        input.focus();
+        function submit(){
+          const n = Number(input.value);
+          if(!Number.isFinite(n) || n<1 || n>50){ input.value=''; input.focus(); return; }
+          tries++; if(n===target){ const timeMs=Math.round(performance.now()-startAt); p1.textContent=S.correct; vibrate(50); setTimeout(()=>{ onDone({ ok:true, stats:{tries,timeMs} }); },180); }
+          else { p1.textContent = n<target?S.higher:S.lower; input.value=''; input.focus(); vibrate([20]); }
+          p2.textContent = S.tries+': '+tries;
+        }
+        btn.onclick=submit; input.addEventListener('keydown',e=>{ if(e.key==='Enter') submit(); });
+      }
+    }
+
+    function ReactionTap(S){
+      const card = el('div',{class:'card'});
+      const h = el('div',{class:'card-h'}); h.appendChild(el('h3',{},S.reactTitle)); h.appendChild(el('p',{class:'muted'},S.reactDesc)); card.appendChild(h);
+      const c = el('div',{class:'card-c center'}); card.appendChild(c);
+
+      if(!skipIntros){
+        const intro = el('div',{class:'intro'}, S.howTitle+': '+S.reactDesc);
+        const startBtn = el('button',{class:'btn primary mt',onclick:()=>{ intro.remove(); run(); }}, S.startGame);
+        c.appendChild(intro); c.appendChild(startBtn); return card;
+      }
+      run(); return card;
+
+      function run(){
+        c.innerHTML='';
+        let round=1; let phase='idle'; let times=[]; let readyAt=null; let waitTimer=null; let startAt=null;
+        const roundP = el('p',{class:'mt'}, S.round(round));
+        const btn = el('button',{class:'btn big primary mt2'}, S.start);
+        c.appendChild(roundP); c.appendChild(btn);
+        function start(){
+          if(!startAt) startAt=performance.now();
+          phase='waiting'; btn.textContent=S.wait; btn.onclick=tap;
+          const d = 500 + Math.floor(Math.random()*1200);
+          waitTimer=setTimeout(()=>{ readyAt=performance.now(); phase='ready'; btn.textContent=S.tap; }, d);
+        }
+        function tap(){
+          if(phase==='waiting'){ clearTimeout(waitTimer); phase='idle'; btn.textContent=S.tooSoon; vibrate([30,40,30]); btn.onclick=start; return; }
+          if(phase==='ready'){
+            const rt = Math.round(performance.now()-readyAt); times=[...times,rt];
+            const avg = Math.round(times.reduce((a,b)=>a+b,0)/times.length);
+            btn.textContent=S.avg(avg); vibrate(20);
+            setTimeout(()=>{
+              if(round>=5){ onDone({ ok:true, stats:{ avgMs:avg, totalMs: Math.round(performance.now()-startAt) } }); }
+              else { round++; roundP.textContent=S.round(round); start(); }
+            },520);
+          }
+        }
+        btn.onclick=start;
+      }
+    }
+
+    function Memory(S){
+      const card = el('div',{class:'card'});
+      const h = el('div',{class:'card-h'}); h.appendChild(el('h3',{},S.memoryTitle)); h.appendChild(el('p',{class:'muted'},S.memoryDesc)); card.appendChild(h);
+      const c = el('div',{class:'card-c'}); card.appendChild(c);
+
+      if(!skipIntros){
+        const intro = el('div',{class:'intro'}, S.howTitle+': '+S.memoryDesc);
+        const startBtn = el('button',{class:'btn primary mt',onclick:()=>{ intro.remove(); run(); }}, S.startGame);
+        c.appendChild(intro); c.appendChild(startBtn); return card;
+      }
+      run(); return card;
+
+      function run(){
+        const base=['A','B','C','D']; const deck=[...base,...base].sort(()=>Math.random()-0.5);
+        const solved = deck.map(()=>false); let flipped=[]; let flips=0; const startAt=performance.now();
+        c.innerHTML='';
+        const grid = el('div',{class:'grid-cards'}); c.appendChild(grid);
+        const info = el('p',{class:'center muted mt'},''); c.appendChild(info);
+        function render(){
+          grid.innerHTML='';
+          deck.forEach((v,i)=>{
+            const b = el('button',{class:'memory-card'+(solved[i]?' solved':''),onclick:()=>click(i)}, (flipped.includes(i)||solved[i])?v:'');
+            grid.appendChild(b);
+          });
+          const pairsLeft = Math.floor((deck.length - solved.filter(Boolean).length)/2);
+          info.textContent = S.pairsLeft(pairsLeft)+' · '+S.flips+': '+flips;
+        }
+        function click(i){
+          if(solved[i]||flipped.includes(i)||flipped.length===2) return;
+          flipped=[...flipped,i]; flips++; render();
+          if(flipped.length===2){ const [a,b]=flipped; if(deck[a]===deck[b]){ solved[a]=solved[b]=true; flipped=[]; render(); if(solved.every(Boolean)){ const timeMs=Math.round(performance.now()-startAt); vibrate(40); setTimeout(()=> onDone({ ok:true, stats:{ flips, timeMs } }),240); } }
+            else { setTimeout(()=>{ flipped=[]; render(); }, 680); }
+          }
+        }
+        render();
+      }
+    }
+
+    function TapSequence(S){
+      const card = el('div',{class:'card'});
+      const h = el('div',{class:'card-h'}); h.appendChild(el('h3',{},S.puzzleTitle)); h.appendChild(el('p',{class:'muted'},S.puzzleDesc)); card.appendChild(h);
+      const c = el('div',{class:'card-c center'}); card.appendChild(c);
+
+      if(!skipIntros){
+        const intro = el('div',{class:'intro'}, S.howTitle+': '+S.puzzleDesc);
+        const startBtn = el('button',{class:'btn primary mt',onclick:()=>{ intro.remove(); run(); }}, S.startGame);
+        c.appendChild(intro); c.appendChild(startBtn); return card;
+      }
+      run(); return card;
+
+      function run(){
+        function make(){ const a=Array.from({length:16},(_,i)=>i+1); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+        let tiles = make(); let next=1; let solved={}; let mistakes=0; const startAt=performance.now();
+        c.innerHTML='';
+        const top = el('p',{class:'mt'}, S.next+': '+next+' · '+S.mistakes+': '+mistakes);
+        const grid = el('div',{class:'puzzle mt'}); c.appendChild(top); c.appendChild(grid);
+        function render(){
+          top.textContent = S.next+': '+next+' · '+S.mistakes+': '+mistakes;
+          grid.innerHTML=''; tiles.forEach((n)=>{ const b=el('button',{class: solved[n]?'solved':'', onclick:()=>tap(n)}, String(n)); grid.appendChild(b); });
+        }
+        function tap(n){
+          if(solved[n]) return; if(n===next){ solved[n]=true; vibrate(10); if(next===16){ const timeMs=Math.round(performance.now()-startAt); setTimeout(()=> onDone({ ok:true, stats:{ timeMs, mistakes } }),220); } next++; render(); }
+          else { mistakes++; vibrate([30,40,30]); solved={}; next=1; tiles=make(); render(); }
+        }
+        render();
+      }
+    }
+
+    function ColorClash(S, lang){
+      const card = el('div',{class:'card'});
+      const h = el('div',{class:'card-h'}); h.appendChild(el('h3',{},S.stroopTitle)); h.appendChild(el('p',{class:'muted'},S.stroopDesc)); card.appendChild(h);
+      const c = el('div',{class:'card-c center'}); card.appendChild(c);
+
+      if(!skipIntros){
+        const intro = el('div',{class:'intro'}, S.howTitle+': '+S.stroopDesc);
+        const startBtn = el('button',{class:'btn primary mt',onclick:()=>{ intro.remove(); run(); }}, S.startGame);
+        c.appendChild(intro); c.appendChild(startBtn); return card;
+      }
+      run(); return card;
+
+      function run(){
+        c.innerHTML='';
+        const COLORS = S.colors;
+        let time=45; let stim=null; let options=[]; let correct=0; let wrong=0; let bestStreak=0; let streak=0; const times=[]; let shownAt=performance.now();
+        const hud = el('p',{class:'muted'},'');
+        const wordEl = el('div',{class:'bigWord'},'');
+        const row = el('div',{class:'colorRow mt'});
+        c.appendChild(hud); c.appendChild(wordEl); c.appendChild(row);
+        const tInt = setInterval(()=>{ time--; updateHud(); if(time<=0){ clearInterval(tInt); const avgMs = times.length? Math.round(times.reduce((a,b)=>a+b,0)/times.length):0; onDone({ ok:true, stats:{ correct, wrong, avgMs, bestStreak } }); } },1000);
+
+        function updateHud(){ hud.textContent = S.secondsLeft(time)+' · '+S.correctCount+': '+correct+' · '+S.wrongCount+': '+wrong+' · '+S.bestStreak+': '+bestStreak; }
+        function localName(c){ return c[lang] || c.en; }
+        function newTrial(){ const w = Math.floor(Math.random()*COLORS.length); const ink = Math.floor(Math.random()*COLORS.length); const opts=new Set([ink]); while(opts.size<4) opts.add(Math.floor(Math.random()*COLORS.length)); options = Array.from(opts).sort(()=>Math.random()-0.5); stim={wordIdx:w, inkIdx:ink}; shownAt=performance.now(); renderTrial(); }
+        function choose(oi){ const rt=Math.round(performance.now()-shownAt); times.push(rt); if(oi===stim.inkIdx){ correct++; streak++; if(streak>bestStreak) bestStreak=streak; vibrate(15); } else { wrong++; streak=0; vibrate([20,40,20]); } newTrial(); }
+        function renderTrial(){ const word = localName(COLORS[stim.wordIdx]); const ink = COLORS[stim.inkIdx]; wordEl.textContent=word; wordEl.style.color=ink.hex; row.innerHTML=''; options.forEach((oi)=>{ const c=COLORS[oi]; const b=el('button',{class:'colorBtn', style:'background:'+c.hex+';color:#fff', onclick:()=>choose(oi)}); b.setAttribute('aria-label', localName(c)); row.appendChild(b); }); updateHud(); }
+
+        newTrial();
+      }
+    }
+
+    // ---------- Renderer ----------
+    function el(tag, attrs, text){
+      const e = document.createElement(tag);
+      if(attrs){ Object.keys(attrs).forEach(k=>{ if(k==='class') e.className=attrs[k]; else if(k==='onclick') e.onclick=attrs[k]; else e.setAttribute(k, attrs[k]); }); }
+      if(text!=null) e.textContent = text;
+      return e;
+    }
+
+    function render(){
+      try{ setDir(); root.innerHTML=''; const S = (screen==='stats') ? STR.ar : STR[lang];
+        if(screen==='welcome') renderWelcome(S);
+        if(screen==='game') renderGame(S);
+        if(screen==='stats') renderStats(STR.ar);
+        $('#err').style.display='none';
+      }catch(e){ const box=$('#err'); box.style.display='block'; box.textContent = 'Runtime error: '+(e&&e.message?e.message:e); console.error(e); }
+    }
+
+    function renderWelcome(S){
+      const c = el('div',{class:'container'});
+      c.appendChild(el('h1',{},S.welcomeTitle));
+      c.appendChild(el('p',{class:'lead'},S.welcomeSubtitle));
+      const grid = el('div',{class:'grid grid-3 mt2'});
+      MEMBERS.forEach((m)=>{
+        const card = el('div',{class:'card', style:'cursor:pointer'});
+        const h = el('div',{class:'card-h center'});
+        h.appendChild(el('div',{class:'avatar '+m.color,style:'margin:10px auto 8px'}, m.name[0]));
+        h.appendChild(el('h3',{},m.name));
+        h.appendChild(el('p',{class:'muted',style:'margin-top:6px'},S.clickToStart));
+        card.appendChild(h); card.onclick=()=>startFor(m);
+        grid.appendChild(card);
+      });
+      c.appendChild(grid);
+
+      const bar = el('div',{class:'toolbar'});
+      const skip = el('button',{class:'pill'+(skipIntros?' active':'')}, S.skipIntros);
+      skip.onclick=()=>{ skipIntros=!skipIntros; localStorage.setItem('ffc_skipIntros', skipIntros?'1':'0'); skip.className='pill'+(skipIntros?' active':''); };
+      const statsBtn = el('button',{class:'pill'}, S.viewStats);
+      statsBtn.onclick=()=>setScreen('stats');
+      bar.appendChild(el('span',{class:'pill'},S.settings)); bar.appendChild(skip); bar.appendChild(statsBtn);
+      c.appendChild(bar);
+
+      root.appendChild(c);
+    }
+
+    function renderGame(S){
+      const c = el('div',{class:'container'});
+      c.appendChild(el('h1',{},S.challengeOf(member.name)));
+      const badges = el('div',{class:'badges progress mt'});
+      games.forEach((g,i)=>{ badges.appendChild(el('span',{class:'badge '+(done[g.id]?'done':(i===step?'':''))}, done[g.id]?'✓':String(i+1))); });
+      c.appendChild(badges);
+
+      let view;
+      const gid = games[step].id;
+      if(gid==='number') view = NumberGuess(S);
+      if(gid==='react')  view = ReactionTap(S);
+      if(gid==='cards')  view = Memory(S);
+      if(gid==='puzzle') view = TapSequence(S);
+      if(gid==='stroop') view = ColorClash(S, lang);
+      c.appendChild(el('div',{class:'mt2'})); c.appendChild(view);
+
+      const back = el('div',{class:'center mt2'});
+      const btn = el('button',{class:'btn'}, S.backToFamily);
+      btn.onclick=()=>{ setScreen('welcome'); member=null; step=0; done={}; sessionStats={}; lang='en'; };
+      back.appendChild(btn); c.appendChild(back);
+
+      root.appendChild(c);
+    }
+
+    function onDone(result){
+      if(!result || !result.ok) return;
+      const id = games[step].id; done[id]=true; sessionStats[id]=result.stats || {};
+      if(step<games.length-1){ step++; render(); }
+      else { endRun(); }
+    }
+
+    // Make onDone visible to game creators
+    window.onDone = onDone;
+
+    function renderStats(S){
+      const c = el('div',{class:'container'});
+      c.appendChild(el('h1',{},S.statsTitle));
+
+      // toolbar
+      const bar = el('div',{class:'toolbar'});
+      bar.appendChild(el('span',{class:'pill'},S.viewMode+':'));
+      const bestBtn = el('button',{class:'pill'+(viewMode==='best'?' active':''),onclick:()=>{viewMode='best'; render();}}, S.best);
+      const latestBtn = el('button',{class:'pill'+(viewMode==='latest'?' active':''),onclick:()=>{viewMode='latest'; render();}}, S.latest);
+      bar.appendChild(bestBtn); bar.appendChild(latestBtn);
+      if(member){ const again=el('button',{class:'pill',onclick:()=>startFor(member)}, S.playAgain); bar.appendChild(again); const reset=el('button',{class:'pill',onclick:()=>resetPlayer(member)}, S.resetPlayer); bar.appendChild(reset); }
+      c.appendChild(bar);
+
+      // quick member switch
+      const pr = el('div',{class:'playersRow'});
+      pr.appendChild(el('span',{class:'pill'}, STR.ar.selectPlayer+':'));
+      MEMBERS.forEach(m=>{ const b=el('button',{class:'btn'+(member&&member.id===m.id?' primary':'')}, m.name); b.onclick=()=>{ member=m; render(); }; pr.appendChild(b); });
+      c.appendChild(pr);
+
+      // left: your results
+      const grid = el('div',{class:'grid grid-2 mt2'});
+      const left = el('div',{class:'card'}); const lh = el('div',{class:'card-h'}); lh.appendChild(el('h3',{}, S.yourResults + (member?(' – '+member.name):''))); left.appendChild(lh);
+      const lc = el('div',{class:'card-c'});
+      if(member){
+        const stats = (board.runs[member.id] && board.runs[member.id][viewMode]) || {};
+        const tbl = el('table',{class:'table'}); const tb = el('tbody',{}); tbl.appendChild(tb);
+        function row(title, text){ const tr=el('tr',{class:'tr'}); tr.appendChild(el('td',{class:'td'}, title)); tr.appendChild(el('td',{class:'td right'}, text)); tb.appendChild(tr); }
+        if(stats.number) row(STR.ar.numberTitle, STR.ar.tries+': '+stats.number.tries+' · '+STR.ar.time+': '+sec(stats.number.timeMs));
+        if(stats.react) row(STR.ar.reactTitle, STR.ar.avgMs+': '+stats.react.avgMs);
+        if(stats.cards) row(STR.ar.memoryTitle, STR.ar.flips+': '+stats.cards.flips+' · '+STR.ar.time+': '+sec(stats.cards.timeMs));
+        if(stats.puzzle) row(STR.ar.puzzleTitle, STR.ar.time+': '+sec(stats.puzzle.timeMs)+' · '+STR.ar.mistakes+': '+stats.puzzle.mistakes);
+        if(stats.stroop) row(STR.ar.stroopTitle, STR.ar.correctCount+': '+stats.stroop.correct+' · '+STR.ar.wrongCount+': '+stats.stroop.wrong+' · '+STR.ar.avgMs+': '+stats.stroop.avgMs+' · '+STR.ar.bestStreak+': '+(stats.stroop.bestStreak||0));
+        lc.appendChild(tbl);
+      } else { lc.appendChild(el('p',{class:'muted'},S.noRuns)); }
+      left.appendChild(lc); grid.appendChild(left);
+
+      // right: leaders
+      const right = el('div',{class:'card'}); const rh=el('div',{class:'card-h'}); rh.appendChild(el('h3',{}, S.leaders)); rh.appendChild(el('p',{class:'muted'}, S.bestEach)); right.appendChild(rh);
+      const rc = el('div',{class:'card-c'});
+      const leaders = computeLeaders(viewMode);
+      function nameOf(id){ const m = MEMBERS.find(x=>x.id===id); return m?m.name:id; }
+      const tbl2 = el('table',{class:'table'}); const tb2=el('tbody',{}); tbl2.appendChild(tb2);
+      function row2(title, text){ const tr=el('tr',{class:'tr'}); tr.appendChild(el('td',{class:'td'}, title)); tr.appendChild(el('td',{class:'td right'}, text)); tb2.appendChild(tr); }
+      row2(STR.ar.numberTitle, leaders.number? (nameOf(leaders.number.memberId)+' — '+STR.ar.tries+': '+leaders.number.tries) : '–');
+      row2(STR.ar.reactTitle, leaders.react? (nameOf(leaders.react.memberId)+' — '+STR.ar.avgMs+': '+leaders.react.avgMs) : '–');
+      row2(STR.ar.memoryTitle, leaders.cards? (nameOf(leaders.cards.memberId)+' — '+STR.ar.flips+': '+leaders.cards.flips) : '–');
+      row2(STR.ar.puzzleTitle, leaders.puzzle? (nameOf(leaders.puzzle.memberId)+' — '+STR.ar.time+': '+sec(leaders.puzzle.timeMs)) : '–');
+      row2(STR.ar.stroopTitle, leaders.stroop? (nameOf(leaders.stroop.memberId)+' — '+STR.ar.correctCount+': '+leaders.stroop.correct+' ('+STR.ar.avgMs+': '+leaders.stroop.avgMs+', '+STR.ar.bestStreak+': '+(leaders.stroop.bestStreak||0)+')') : '–');
+      rc.appendChild(tbl2); right.appendChild(rc); grid.appendChild(right);
+
+      // all runs
+      const all = el('div',{class:'card mt2'}); const ah=el('div',{class:'card-h'}); ah.appendChild(el('h3',{}, S.allRuns)); all.appendChild(ah);
+      const ac = el('div',{class:'card-c'});
+      const runs = board.runs || {}; const keys = Object.keys(runs);
+      const tbl3 = el('table',{class:'table'}); const tb3=el('tbody',{}); tbl3.appendChild(tb3);
+      if(keys.length===0){ const tr=el('tr',{class:'tr'}); tr.appendChild(el('td',{class:'td'}, S.noRuns)); tb3.appendChild(tr); }
+      keys.forEach((mid)=>{
+        const entry = runs[mid]; const stats = entry && entry[viewMode] || {};
+        const tr = el('tr',{class:'tr'});
+        const nameTd = el('td',{class:'td'}, nameOf(mid));
+        const valTd = el('td',{class:'td right'}, '');
+        function line(k,title,fmt){ if(stats[k]){ const d = el('div',{}, title+': '+fmt(stats[k])); valTd.appendChild(d); } }
+        line('number', STR.ar.numberTitle, s=> STR.ar.tries+': '+s.tries);
+        line('react', STR.ar.reactTitle, s=> STR.ar.avgMs+': '+s.avgMs);
+        line('cards', STR.ar.memoryTitle, s=> STR.ar.flips+': '+s.flips);
+        line('puzzle', STR.ar.puzzleTitle, s=> STR.ar.time+': '+sec(s.timeMs));
+        line('stroop', STR.ar.stroopTitle, s=> STR.ar.correctCount+': '+s.correct+' ('+STR.ar.avgMs+': '+s.avgMs+', '+STR.ar.bestStreak+': '+(s.bestStreak||0)+')');
+        tr.appendChild(nameTd); tr.appendChild(valTd); tb3.appendChild(tr);
+      });
+      ac.appendChild(tbl3); all.appendChild(ac);
+
+      c.appendChild(grid); c.appendChild(all);
+      const back = el('div',{class:'center mt2'}); const btn = el('button',{class:'btn',onclick:()=>setScreen('welcome')}, STR.ar.backToFamily); back.appendChild(btn); c.appendChild(back);
+      root.appendChild(c);
+    }
+
+    function resetPlayer(m){ if(!m) return; if(confirm(STR.ar.confirmResetPlayer(m.name))){ const next = { runs: Object.assign({}, board.runs) }; delete next.runs[m.id]; board=next; saveBoard(board); render(); } }
+
+    // initial render
+    setDir(); render();
+
+    // ---------- Self tests ----------
+    (function selfTests(){
+      const tests=[]; const assert=(name,cond)=>tests.push({name,passed:!!cond});
+      assert('better.number fewer tries', better.number({tries:2,timeMs:1200}, {tries:3,timeMs:900}) === true);
+      assert('better.number tiebreak time', better.number({tries:3,timeMs:800}, {tries:3,timeMs:900}) === true);
+      const L = computeLeaders('best'); assert('leaders empty ok', !!L && typeof L==='object');
+      const box=document.createElement('div'); box.className='selftest'; const passed=tests.filter(t=>t.passed).length; const total=tests.length; box.innerHTML = '<b>Self-tests:</b> <span class="'+(passed===total?'pass':'fail')+'">'+passed+'/'+total+' passed</span>'; document.body.appendChild(box);
+      if(passed!==total){ console.group('Self‑tests'); tests.forEach(t=>console[t.passed?'log':'error']((t.passed?'✔':'✖')+' '+t.name)); console.groupEnd(); }
+    })();
+
+    // expose to games
+    function onDoneStub(){ /* replaced at runtime */ }
+    // Already assigned window.onDone earlier; this is just to satisfy linters
+  })();
+  </script>
+</body>
+</html>
